@@ -1,0 +1,19 @@
+[package]
+name = "chembasics"
+version = "0.1.0"
+authors = ["andres"]
+edition = "2018"
+build = "build.rs"
+description = "Things for chemistry"
+categories = ["science"]
+keywords = ["chemistry", "chemical", "smiles"]
+license = "MIT"
+readme = "README.md"
+documentation = "https://docs.rs/chembasics/"
+homepage = "https://crates.io/crates/chembasics"
+repository = "https://github.com/sandmor/chembasics"
+
+[dependencies]
+ptable = "0"
+[build-dependencies]
+ptable = "0"
