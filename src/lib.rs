@@ -16,7 +16,7 @@ fn parse_element(string: &[u8]) -> (Option<Element>, &[u8]) {
     if string.len() >= 2 && string[1].is_ascii_lowercase() {
         end += 1;
     }
-    (Element::from_symbol(unsafe { mem::transmute(&string[..end]) }), &string[end..])
+    (Element::from_symbol(unsafe { std::str::from_utf8_unchecked(&string[..end]) }), &string[end..])
 }
 
 fn parse_number(string: &[u8]) -> (usize, &[u8]) {
