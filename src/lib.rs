@@ -13,7 +13,7 @@ pub use basic_formulas::*;
 
 fn parse_element(string: &[u8]) -> (Option<Element>, &[u8]) {
     let mut end = 1;
-    if string.len() >= 2 && string[1] >= b'a' && string[1] <= b'z' {
+    if string.len() >= 2 && string[1].is_ascii_lowercase() {
         end += 1;
     }
     (Element::from_symbol(unsafe { mem::transmute(&string[..end]) }), &string[end..])
@@ -22,7 +22,7 @@ fn parse_element(string: &[u8]) -> (Option<Element>, &[u8]) {
 fn parse_number(string: &[u8]) -> (usize, &[u8]) {
     let mut digits = Vec::new();
     let mut end = 0;
-    while string.len() > end && (string[end] >= b'0' && string[end] <= b'9') {
+    while string.len() > end && string[end].is_ascii_digit() {
         digits.push(string[end] - b'0');
         end += 1;
     }

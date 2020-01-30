@@ -26,7 +26,7 @@ impl EmpiricalFormula {
             return Err(());
         }
         while !string.is_empty() {
-            if string[0] < b'A' || string[0] > b'Z' {
+            if !string[0].is_ascii_uppercase() {
                 return Err(());
             }
             let (e, s) = parse_element(string);
@@ -42,7 +42,7 @@ impl EmpiricalFormula {
                 elements.push((e, count));
                 break;
             }
-            if string[0] >= b'0' && string[0] <= b'9' {
+            if string[0].is_ascii_digit() {
                 let (c, s) = parse_number(string);
                 count = c;
                 elements.push((e, count));
@@ -188,7 +188,7 @@ fn parse_group(mut string: &[u8]) -> Result<(MolecularFormula, &[u8]), ()> {
             ElementOrGroup::Group(g)
         }
         else {
-            if string[0] < b'A' || string[0] > b'Z' {
+            if !string[0].is_ascii_uppercase() {
                 return Err(());
             }
             let (e, s) = parse_element(string);
@@ -205,7 +205,7 @@ fn parse_group(mut string: &[u8]) -> Result<(MolecularFormula, &[u8]), ()> {
         if string.is_empty() {
             return Err(());
         }
-        if string[0] >= b'0' && string[0] <= b'9' {
+        if string[0].is_ascii_digit() {
             let (c, s) = parse_number(string);
             count = c;
             result.push((e, count));
@@ -242,7 +242,7 @@ impl MolecularFormula {
                 ElementOrGroup::Group(g)
             }
             else {
-                if string[0] < b'A' || string[0] > b'Z' {
+                if !string[0].is_ascii_uppercase() {
                     return Err(());
                 }
                 let (e, s) = parse_element(string);
@@ -260,7 +260,7 @@ impl MolecularFormula {
                 result.push((e, count));
                 break;
             }
-            if string[0] >= b'0' && string[0] <= b'9' {
+            if string[0].is_ascii_digit() {
                 let (c, s) = parse_number(string);
                 count = c;
                 result.push((e, count));
