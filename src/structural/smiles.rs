@@ -1,5 +1,6 @@
 use std::hint::unreachable_unchecked;
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU8;
 
 use ptable::Element;
 
@@ -30,7 +31,7 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
     let mut waiting_bond = None; // The bond is parse first and store here for the next ion, which takes it
     let bond_count_in_the_probably_aromatic_ring = bonds_in_the_probably_aromatic_ring.len();
     macro_rules! insert_ion {
-        ($atom:expr, $is_aromatic:expr, $charge:expr) => {{
+        ($atom:expr, $is_aromatic:expr, $charge:expr, $isotopic_spec:expr) => {{
             let mut labels = Vec::new();
             while !string.is_empty() {
                 let mut bond = None;
@@ -159,7 +160,7 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                 misc.aromatic_ions.insert(sf.atoms.len());
             }
             adj_atom = Some(sf.atoms.len());
-            sf.atoms.push((Ion::new($atom, $charge), current_bounds));
+            sf.atoms.push((Isotope::new(Ion::new($atom, $charge), $isotopic_spec), current_bounds));
         }};
     }
     if let Some(_) = adj_atom {
@@ -190,34 +191,34 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
         if chr == b'B' {
             if string.is_empty() {
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Boron, false, 0);
+                insert_ion!(Element::Boron, false, 0, None);
                 break;
             }
             if string[0] == b'r' {
                 string = &string[1..];
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Bromine, false, 0);
+                insert_ion!(Element::Bromine, false, 0, None);
             }
             else {
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Boron, false, 0);
+                insert_ion!(Element::Boron, false, 0, None);
             }
             continue;
         }
         else if chr == b'C' {
             if string.is_empty() {
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Carbon, false, 0);
+                insert_ion!(Element::Carbon, false, 0, None);
                 break;
             }
             if string[0] == b'l' {
                 string = &string[1..];
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Chlorine, false, 0);
+                insert_ion!(Element::Chlorine, false, 0, None);
             }
             else {
                 misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                insert_ion!(Element::Carbon, false, 0);
+                insert_ion!(Element::Carbon, false, 0, None);
             }
             continue;
         }
@@ -225,8 +226,21 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
             if string.is_empty() {
                 return Err(());
             }
+            let mut isotopic_spec = None;
+            if string[0] >= b'0' && string[0] <= b'9' {
+                // Isotopic specification
+                let (r, s) = parse_number(string);
+                string = s;
+                if r >= 256 {
+                    return Err(());
+                }
+                isotopic_spec = NonZeroU8::new(r as u8);
+                if string.is_empty() {
+                    return Err(());
+                }
+            }
             while string[0] != b']' {
-                if string.len() <= 2 { // 1: X, 2: ]  "X]"
+                if string.len() < 2 { // 1: X, 2: ]  "X]"
                     return Err(());
                 }
                 let e;
@@ -299,7 +313,8 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                         charge = -charge;
                     }
                 }
-                insert_ion!(e, aromatic, charge);
+                insert_ion!(e, aromatic, charge, isotopic_spec);
+                isotopic_spec = None;
             }
             string = &string[1..];
         }
@@ -310,7 +325,7 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                 let m = l + (r - l) / 2;
                 if SMILES_SPECIAL_UNICHR_ELEMENTS[m].0 == chr {
                     misc.automatic_hydrogens_targets.push(sf.atoms.len());
-                    insert_ion!(SMILES_SPECIAL_UNICHR_ELEMENTS[m].1, false, 0);
+                    insert_ion!(SMILES_SPECIAL_UNICHR_ELEMENTS[m].1, false, 0, None);
                     continue 'mainloop;
                 }
                 if SMILES_SPECIAL_UNICHR_ELEMENTS[m].0 < chr {
@@ -323,19 +338,19 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
         }
         else if chr == b'c' {
             misc.automatic_hydrogens_targets.push(sf.atoms.len());
-            insert_ion!(Element::Carbon, true, 0);
+            insert_ion!(Element::Carbon, true, 0, None);
         }
         else if chr == b'o' {
             misc.automatic_hydrogens_targets.push(sf.atoms.len());
-            insert_ion!(Element::Oxygen, true, 0);
+            insert_ion!(Element::Oxygen, true, 0, None);
         }
         else if chr == b's' {
             misc.automatic_hydrogens_targets.push(sf.atoms.len());
-            insert_ion!(Element::Sulfur, true, 0);
+            insert_ion!(Element::Sulfur, true, 0, None);
         }
         else if chr == b'n' {
             misc.automatic_hydrogens_targets.push(sf.atoms.len());
-            insert_ion!(Element::Nitrogen, true, 0);
+            insert_ion!(Element::Nitrogen, true, 0, None);
         }
         else if chr == b'(' {
             // Branch

@@ -71,5 +71,6 @@ mod tests {
         test!("c1cc2c(c(c1)N)c(=O)[nH][nH]c2=O", "C8H7N3O2"); // Luminol
         test!("C1=CC(=CC=C1C(=O)O)C(=O)O.C1=CC(=CC=C1N)N", "C14H14N2O4"); // Poly(p-phenylene terephthalamide)
         test!("C[N+](C)(C)CCOP(=O)([O-])OCC(COC(=O)CCCCCCCCCCCOC(=O)CCCCC1CSSC1)OC(=O)CCCCCCCCCCCOC(=O)CCCCC2CSSC2", "C48H88NO12PS4"); // Dilipoyl lipid
+        test!("[2H]", "H"); // Deuterium
     }
 }

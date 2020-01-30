@@ -26,7 +26,7 @@ pub struct Bond<B: BondClass> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Molecule {
-    pub atoms: Vec<(Ion, Vec<usize>)>,
+    pub atoms: Vec<(Isotope, Vec<usize>)>,
     pub bonds: Vec<Bond<StructuralBondKind>>,
 }
 
@@ -36,7 +36,7 @@ impl Molecule {
         let string = string.as_bytes();
         let mut misc = smiles::SMILESMisc { automatic_hydrogens_targets: Vec::new(), 
             labels: BTreeMap::new(), aromatic_ions: BTreeSet::new() };
-        smiles::parse_smiles_group(string, &mut sf, &mut misc, None, &mut smiles::AromaticDetectionData { init: false, 
+        let _ = smiles::parse_smiles_group(string, &mut sf, &mut misc, None, &mut smiles::AromaticDetectionData { init: false, 
             last_one_was_double: false }, &mut Vec::new())?;
         for atom in misc.automatic_hydrogens_targets {
             let mut actual_valence = 0;
@@ -86,7 +86,7 @@ impl Molecule {
                 let b = vec![sf.bonds.len()];
                 sf.atoms[atom].1.push(sf.bonds.len());
                 sf.bonds.push(Bond { a: atom, b: sf.atoms.len(), k: StructuralBondKind::Single });
-                sf.atoms.push((Ion::new(Element::Hydrogen, 0), b));
+                sf.atoms.push((Isotope::from(Element::Hydrogen), b));
             }
         }
         Ok(sf)

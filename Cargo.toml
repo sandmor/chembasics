@@ -1,12 +1,12 @@
 [package]
 name = "chembasics"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["andres"]
 edition = "2018"
 build = "build.rs"
 description = "Things for chemistry"
 categories = ["science"]
-keywords = ["chemistry", "chemical", "smiles"]
+keywords = ["chemistry", "chemical", "smiles", "molecules", "formulas"]
 license = "MIT"
 readme = "README.md"
 documentation = "https://docs.rs/chembasics/"

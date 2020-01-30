@@ -18,20 +18,40 @@ impl Isotope {
         Self::new(Ion::from(element), neutrons)
     }
 
+    #[inline(always)]
     pub fn get_ion(&self) -> &Ion {
         &self.ion
     }
 
+    #[inline(always)]
     pub fn get_ion_mut(&mut self) -> &mut Ion {
         &mut self.ion
     }
 
+    #[inline(always)]
     pub fn get_neutrons_count(&self) -> &Option<NonZeroU8> {
         &self.neutrons
     }
 
+    #[inline(always)]
     pub fn get_neutrons_count_mut(&mut self) -> &mut Option<NonZeroU8> {
         &mut self.neutrons
+    }
+
+    #[inline(always)]
+    pub fn get_element(&self) -> &Element {
+        self.ion.get_element()
+    }
+
+    #[inline(always)]
+    pub fn get_element_mut(&mut self) -> &mut Element {
+        self.ion.get_element_mut()
+    }
+}
+
+impl From<Element> for Isotope {
+    fn from(i: Element) -> Isotope {
+        Isotope::from_element(i, None)
     }
 }
 
