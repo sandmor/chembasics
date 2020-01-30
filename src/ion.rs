@@ -41,3 +41,22 @@ impl Ion {
         self.charge = charge;
     }
 }
+
+
+impl From<Element> for Ion {
+    fn from(e: Element) -> Ion {
+        Ion::new(e, 0)
+    }
+}
+
+impl AsRef<Element> for Ion {
+    fn as_ref(&self) -> &Element {
+        &self.element
+    }
+}
+
+impl AsMut<Element> for Ion {
+    fn as_mut(&mut self) -> &mut Element {
+        &mut self.element
+    }
+}

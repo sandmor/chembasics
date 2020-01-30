@@ -3,11 +3,13 @@ use std::mem;
 use ptable::Element;
 
 mod ion;
+mod isotope;
 mod basic_formulas;
 mod structural;
 pub mod consts;
 
 pub use ion::*;
+pub use isotope::*;
 pub use structural::*;
 pub use basic_formulas::*;
 
