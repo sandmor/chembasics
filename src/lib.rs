@@ -53,9 +53,9 @@ impl BondClass for QuantumBondKind {}
 mod tests {
     #[test]
     fn smiles_parse() {
-        use crate::{Molecule, EmpiricalFormula, MoleculeEx};
+        use crate::*;
         macro_rules! test {
-            ($smiles:expr, $f:expr) => { assert_eq!(Molecule::from_smiles(
+            ($smiles:expr, $f:expr) => { assert_eq!(Compound::from_smiles(
                 $smiles).unwrap().get_empirical_formula(), 
                 EmpiricalFormula::from_string($f).unwrap()) };
         }

@@ -31,7 +31,7 @@ pub struct Molecule {
 }
 
 impl Molecule {
-    fn from_smiles(string: &str) -> Result<Molecule, ()> {
+    pub fn from_smiles(string: &str) -> Result<Molecule, ()> {
         let mut sf = Molecule { atoms: Vec::new(), bonds: Vec::new() };
         let string = string.as_bytes();
         let mut misc = smiles::SMILESMisc { automatic_hydrogens_targets: Vec::new(), 
@@ -123,6 +123,7 @@ impl AdvancedFormula for Molecule {
     }
 }
 
+/// A collection of multiple molecules
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Compound {
     groups: Vec<Molecule>
