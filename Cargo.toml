@@ -15,5 +15,7 @@ repository = "https://github.com/sandmor/chembasics"
 
 [dependencies]
 ptable = "0"
+image = "0"
+rayon = "1"
 [build-dependencies]
 ptable = "0"

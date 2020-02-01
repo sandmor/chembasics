@@ -1,10 +1,11 @@
 mod smiles;
 
+use crate::Point;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::*;
 
-//include!(concat!(env!("OUT_DIR"), "/valences.rs"));   // This adds a VALENCE constant, which is an arrangement of valence electrons number of all periodic table atoms
+include!(concat!(env!("OUT_DIR"), "/valences.rs"));
 
 // The order is important, that is used for optimize various things, DO NOT ALTER
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -24,15 +25,16 @@ pub struct Bond<B: BondClass> {
     pub k: B
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Molecule {
     pub atoms: Vec<(Isotope, Vec<usize>)>,
     pub bonds: Vec<Bond<StructuralBondKind>>,
+    pub coords: Option<Vec<Point>>,
 }
 
 impl Molecule {
     pub fn from_smiles(string: &str) -> Result<Molecule, ()> {
-        let mut sf = Molecule { atoms: Vec::new(), bonds: Vec::new() };
+        let mut sf = Molecule { atoms: Vec::new(), bonds: Vec::new(), coords: None };
         let string = string.as_bytes();
         let mut misc = smiles::SMILESMisc { automatic_hydrogens_targets: Vec::new(), 
             labels: BTreeMap::new(), aromatic_ions: BTreeSet::new() };
@@ -97,6 +99,41 @@ impl Molecule {
             *empirical.entry(*a.0.get_element()).or_insert(0) += 1;
         }
     }
+
+    fn generate_atom_coords(&self, link_u: f64, link_v: f64, index: usize, coords_gen: &mut [bool], lonely_pairs: &[u8]) {
+        let electronic_clouds_count = self.atoms[index].1.len() + lonely_pairs[index] as usize;
+        let mut u = link_u;
+        let mut v = link_v;
+        for i in self.atoms[index].1.iter() {
+            
+        }
+    }
+
+    fn generate_coords(&self) -> Vec<Point> {
+        let mut coords = vec![Point::new(0., 0., 0.); self.atoms.len()];
+        let mut coords_gen = vec![false; self.atoms.len()];
+        let mut lonely_pairs = vec![0; self.atoms.len()];
+        for (i, atom) in self.atoms.iter().enumerate() {
+            let mut lp = VALENCES[atom.0.get_element().get_id() as usize] as i8;
+            for bid in atom.1.iter() {
+                lp -= self.bonds[*bid as usize].k as i8;
+            }
+            lp -= atom.0.get_ion().get_charge();
+            lp /= 2;
+            if lp < 0 {
+                panic!("Negative lonely pairs count");
+            }
+            lonely_pairs[i] = lp as u8;
+        }
+        self.generate_atom_coords(0., 0., 0, &mut coords_gen, &lonely_pairs);
+        coords
+    }
+
+    pub fn atom_coords(&mut self) {
+        if let None = self.coords {
+            self.generate_coords();
+        }
+    }
 }
 
 impl BasicMolecule for Molecule {
@@ -124,7 +161,7 @@ impl AdvancedFormula for Molecule {
 }
 
 /// A collection of multiple molecules
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Compound {
     groups: Vec<Molecule>
 }
