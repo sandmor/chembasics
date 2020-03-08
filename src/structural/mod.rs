@@ -1,22 +1,70 @@
+use std::num::{ParseIntError, ParseFloatError};
+use std::str::Utf8Error;
+use std::collections::BTreeMap;
+use std::io::{self, Read};
+use std::ops::Deref;
+
 mod smiles;
+mod cml;
+mod mol;
+mod nomenclature;
+pub use mol::MolFile;
 
 use crate::Point;
-use std::collections::{BTreeMap, BTreeSet};
-
 use crate::*;
 
 include!(concat!(env!("OUT_DIR"), "/valences.rs"));
 
+#[derive(Debug)]
+pub enum ParserError {
+    Syntax,
+    IO(io::Error),
+    Utf8(Utf8Error),
+    UnexpectedEof,
+    ParseInt(ParseIntError),
+    ParseFloat(ParseFloatError),
+}
+
+impl From<xml::reader::Error> for ParserError {
+    fn from(x: xml::reader::Error) -> ParserError {
+        use xml::reader::ErrorKind;
+        match x.kind().clone() {
+            ErrorKind::Syntax(_) => ParserError::Syntax,
+            ErrorKind::Io(e) => ParserError::IO(e),
+            ErrorKind::Utf8(e) => ParserError::Utf8(e),
+            ErrorKind::UnexpectedEof => ParserError::UnexpectedEof
+        }
+    }
+}
+
+impl From<ParseIntError> for ParserError {
+    fn from(p: ParseIntError) -> ParserError {
+        ParserError::ParseInt(p)
+    }
+}
+
+impl From<ParseFloatError> for ParserError {
+    fn from(p: ParseFloatError) -> ParserError {
+        ParserError::ParseFloat(p)
+    }
+}
+
+impl From<io::Error> for ParserError {
+    fn from(e: io::Error) -> ParserError {
+        ParserError::IO(e)
+    }
+}
+
 // The order is important, that is used for optimize various things, DO NOT ALTER
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum StructuralBondKind {
+pub enum StructuralBond {
     Aromatic,
     Single,
     Double,
     Triple,
 }
 
-impl BondClass for StructuralBondKind {}
+impl BondClass for StructuralBond {}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Bond<B: BondClass> {
@@ -25,113 +73,50 @@ pub struct Bond<B: BondClass> {
     pub k: B
 }
 
+impl<B: BondClass> Bond<B> {
+    pub fn new(a: usize, b: usize, k: B) -> Bond<B> {
+        Bond { a, b, k }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AtomAndBondI {
+    pub atom: Isotope,
+    pub bonds: Vec<usize>
+}
+
+impl Deref for AtomAndBondI {
+    type Target = Isotope;
+    
+    fn deref(&self) -> &Isotope {
+        &self.atom
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Molecule {
-    pub atoms: Vec<(Isotope, Vec<usize>)>,
-    pub bonds: Vec<Bond<StructuralBondKind>>,
+    pub atoms: Vec<AtomAndBondI>,
+    pub bonds: Vec<Bond<StructuralBond>>,
     pub coords: Option<Vec<Point>>,
 }
 
 impl Molecule {
     pub fn from_smiles(string: &str) -> Result<Molecule, ()> {
-        let mut sf = Molecule { atoms: Vec::new(), bonds: Vec::new(), coords: None };
-        let string = string.as_bytes();
-        let mut misc = smiles::SMILESMisc { automatic_hydrogens_targets: Vec::new(), 
-            labels: BTreeMap::new(), aromatic_ions: BTreeSet::new() };
-        let _ = smiles::parse_smiles_group(string, &mut sf, &mut misc, None, &mut smiles::AromaticDetectionData { init: false, 
-            last_one_was_double: false }, &mut Vec::new())?;
-        for atom in misc.automatic_hydrogens_targets {
-            let mut actual_valence = 0;
-            let mut aromatic_flip_flop = true;
-            for bond in sf.atoms[atom].1.iter() {
-                if sf.bonds[*bond].k == StructuralBondKind::Aromatic {
-                    actual_valence += 1;
-                    if aromatic_flip_flop {
-                        actual_valence += 1;
-                    }
-                    aromatic_flip_flop = !aromatic_flip_flop;
-                }
-                actual_valence += sf.bonds[*bond].k as isize;
-            }
-            let lack = match sf.atoms[atom].0.get_element() {
-                Element::Boron => 3 - actual_valence,
-                Element::Carbon => 4 - actual_valence,
-                Element::Nitrogen | Element::Phosphorus => {
-                    if actual_valence <= 3 {
-                        3 - actual_valence
-                    }
-                    else if actual_valence <= 5 {
-                        5 - actual_valence
-                    }
-                    else {
-                        0
-                    }
-                },
-                Element::Oxygen => 2 - actual_valence,
-                Element::Sulfur => {
-                    if actual_valence <= 2 {
-                        2 - actual_valence
-                    }
-                    else if actual_valence <= 4 {
-                        4 - actual_valence
-                    }
-                    else if actual_valence <= 6 {
-                        6 - actual_valence
-                    }
-                    else {
-                        0
-                    }
-                },
-                _ => 1 - actual_valence
-            };
-            for _ in 0..lack {
-                let b = vec![sf.bonds.len()];
-                sf.atoms[atom].1.push(sf.bonds.len());
-                sf.bonds.push(Bond { a: atom, b: sf.atoms.len(), k: StructuralBondKind::Single });
-                sf.atoms.push((Isotope::from(Element::Hydrogen), b));
-            }
-        }
-        Ok(sf)
+        smiles::parse(string)
     }
 
     fn get_empirical_formula_optimize(&self, empirical: &mut BTreeMap<Element, usize>) {
         for a in self.atoms.iter() {
-            *empirical.entry(*a.0.get_element()).or_insert(0) += 1;
+            *empirical.entry(*a.atom.get_element()).or_insert(0) += 1;
         }
     }
 
-    fn generate_atom_coords(&self, link_u: f64, link_v: f64, index: usize, coords_gen: &mut [bool], lonely_pairs: &[u8]) {
-        let electronic_clouds_count = self.atoms[index].1.len() + lonely_pairs[index] as usize;
-        let mut u = link_u;
-        let mut v = link_v;
-        for i in self.atoms[index].1.iter() {
-            
+    pub fn atom_coords(&mut self) -> Option<&[Point]> {
+        if let Some(ref r) = self.coords {
+            Some(r)
         }
-    }
-
-    fn generate_coords(&self) -> Vec<Point> {
-        let mut coords = vec![Point::new(0., 0., 0.); self.atoms.len()];
-        let mut coords_gen = vec![false; self.atoms.len()];
-        let mut lonely_pairs = vec![0; self.atoms.len()];
-        for (i, atom) in self.atoms.iter().enumerate() {
-            let mut lp = VALENCES[atom.0.get_element().get_id() as usize] as i8;
-            for bid in atom.1.iter() {
-                lp -= self.bonds[*bid as usize].k as i8;
-            }
-            lp -= atom.0.get_ion().get_charge();
-            lp /= 2;
-            if lp < 0 {
-                panic!("Negative lonely pairs count");
-            }
-            lonely_pairs[i] = lp as u8;
-        }
-        self.generate_atom_coords(0., 0., 0, &mut coords_gen, &lonely_pairs);
-        coords
-    }
-
-    pub fn atom_coords(&mut self) {
-        if let None = self.coords {
-            self.generate_coords();
+        else {
+            None
         }
     }
 }
@@ -139,8 +124,8 @@ impl Molecule {
 impl BasicMolecule for Molecule {
     fn get_molecular_weight(&self) -> f32 {
         let mut weight = 0.0;
-        for (e, _) in self.atoms.iter() {
-            weight += e.get_element().get_atomic_mass();
+        for atom in self.atoms.iter() {
+            weight += atom.atom.get_element().get_atomic_mass();
         }
         weight
     }
@@ -150,7 +135,7 @@ impl AdvancedFormula for Molecule {
     fn get_empirical_formula(&self) -> EmpiricalFormula {
         let mut empirical = BTreeMap::new();
         for a in self.atoms.iter() {
-            *empirical.entry(a.0).or_insert(0) += 1;
+            *empirical.entry(a.atom).or_insert(0) += 1;
         }
         let mut res = Vec::with_capacity(empirical.len());
         for (k, v) in empirical {
@@ -163,23 +148,51 @@ impl AdvancedFormula for Molecule {
 /// A collection of multiple molecules
 #[derive(Debug, Clone, PartialEq)]
 pub struct Compound {
-    groups: Vec<Molecule>
+    molecules: Vec<Molecule>
 }
 
 impl Compound {
     pub fn from_smiles(smiles: &str) -> Result<Compound, ()> {
-        let mut groups = Vec::new();
-        for group in smiles.split('.') {
-            groups.push(Molecule::from_smiles(group)?);
+        let mut molecules = Vec::new();
+        for molecule in smiles.split('.') {
+            molecules.push(Molecule::from_smiles(molecule)?);
         }
-        Ok(Compound { groups })
+        Ok(Compound { molecules })
+    }
+
+    pub fn from_cml<R: Read>(reader: R) -> Result<Compound, ParserError> {
+        cml::parse(reader)
+    }
+
+    pub fn from_mol<R: Read>(reader: R) -> Result<Compound, ParserError> {
+        Ok(MolFile::parse(reader)?.into_compound())
+    }
+
+    pub fn iter(&self) -> CompoundIterator {
+        CompoundIterator { compound: &self, pos: 0 }
+    }
+
+    pub fn atoms_count(&self) -> usize {
+        let mut total = 0;
+        for molecule in self.molecules.iter() {
+            total += molecule.atoms.len();
+        }
+        total
+    }
+
+    pub fn bonds_count(&self) -> usize {
+        let mut total = 0;
+        for molecule in self.molecules.iter() {
+            total += molecule.bonds.len();
+        }
+        total
     }
 }
 
 impl BasicMolecule for Compound {
     fn get_molecular_weight(&self) -> f32 {
         let mut weight = 0.0;
-        for g in self.groups.iter() {
+        for g in self.molecules.iter() {
             weight += g.get_molecular_weight();
         }
         weight
@@ -189,7 +202,7 @@ impl BasicMolecule for Compound {
 impl AdvancedFormula for Compound {
     fn get_empirical_formula(&self) -> EmpiricalFormula {
         let mut empirical = BTreeMap::new();
-        for g in self.groups.iter() {
+        for g in self.molecules.iter() {
             g.get_empirical_formula_optimize(&mut empirical);
         }
         let mut res = Vec::with_capacity(empirical.len());
@@ -197,5 +210,25 @@ impl AdvancedFormula for Compound {
             res.push((k, v));
         }
         EmpiricalFormula::new(res)
+    }
+}
+
+pub struct CompoundIterator<'a> {
+    compound: &'a Compound,
+    pos: usize
+}
+
+impl<'a> Iterator for CompoundIterator<'a> {
+    type Item = &'a Molecule;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.compound.molecules.get(self.pos) {
+            Some(m) => {
+                self.pos += 1;
+                Some(m)
+            },
+            None => {
+                None
+            }
+        }
     }
 }

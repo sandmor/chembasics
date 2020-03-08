@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub, Mul};
+use std::ops::{Add, Sub, Mul, Div};
 
 use crate::ra::scene::*;
 
@@ -8,9 +8,9 @@ pub const PLPI: PL = std::f64::consts::PI;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector {
-    x: PL,
-    y: PL,
-    z: PL,
+    pub x: PL,
+    pub y: PL,
+    pub z: PL,
 }
 
 impl Vector {
@@ -56,6 +56,13 @@ impl Mul<PL> for Vector {
     type Output = Vector;
     fn mul(self, f: PL) -> Vector {
         Vector { x: self.x * f, y: self.y * f, z: self.z * f }
+    }
+}
+
+impl Div<PL> for Vector {
+    type Output = Vector;
+    fn div(self, f: PL) -> Vector {
+        Vector { x: self.x / f, y: self.y / f, z: self.z / f }
     }
 }
 

@@ -17,5 +17,10 @@ repository = "https://github.com/sandmor/chembasics"
 ptable = "0"
 image = "0"
 rayon = "1"
+xml-rs = "0.8"
+fnv = "1"
 [build-dependencies]
 ptable = "0"
+[dev-dependencies]
+glutin = "0"
+gl = "0"

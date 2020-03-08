@@ -56,13 +56,15 @@ impl BondClass for QuantumBondKind {}
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use std::fs::File;
 
     #[test]
-    fn smiles_parse() {
+    fn smiles_test() {
         macro_rules! test {
-            ($smiles:expr, $f:expr) => { assert_eq!(Compound::from_smiles(
-                $smiles).unwrap().get_empirical_formula(), 
-                EmpiricalFormula::from_string($f).unwrap()) };
+            ($smiles:expr, $f:expr) => {
+                let compound = Compound::from_smiles($smiles).unwrap();
+                assert_eq!(compound.get_empirical_formula(), EmpiricalFormula::from_string($f).unwrap())
+            };
         }
         test!("O", "H2O"); // Aqua
         test!("OO", "H2O2"); // Hydrogen peroxide
@@ -79,11 +81,11 @@ mod tests {
 
     #[test]
     fn raytracer() {
-        use crate::ra::*;
+        /*use crate::ra::*;
         let mut atom_coordinates = Molecule::from_smiles("FS(F)(F)(F)(F)F").unwrap().atom_coords();
         let scene = Scene { fov: 90., width: 512, height: 512,
             lights: vec![Light { pos: Point::new(0.,2.,0.), intensity: 5. }],
             items: vec![Item { pos: Point::new(0., 0., -5.), kind: ItemKind::Atom(1.2, [1., 0., 1.]) }] };
-        draw(scene);
+        draw(scene);*/
     }
 }

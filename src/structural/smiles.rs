@@ -23,7 +23,7 @@ pub struct AromaticDetectionData {
 // aromatic_detection_data = Small structure composed of information to the formation of an aromatic ring,
 // bonds_in_the_probably_aromatic_ring = The atoms that possibly make up the aromatic ring that is being checked, this is restored by the function called
 #[allow(unused_assignments)]  // Rust compiler is buggy
-pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mut SMILESMisc, 
+fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mut SMILESMisc, 
     mut adj_atom: Option<usize>, aromatic_detection_data: &mut AromaticDetectionData,
     bonds_in_the_probably_aromatic_ring: &mut Vec<usize>) -> Result<&'a [u8], ()> {
     const SMILES_SPECIAL_UNICHR_ELEMENTS: [(u8, Element); 6] = [(b'F', Element::Fluorine), (b'I', Element::Iodine), 
@@ -38,10 +38,10 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                 let mut pos = 0;
                 if string[0] == b':' || string[0] == b'-' || string[0] == b'=' || string[0] == b'#' {
                     bond = Some(match string[0] {
-                        b':' => StructuralBondKind::Aromatic,
-                        b'-' => StructuralBondKind::Single,
-                        b'=' => StructuralBondKind::Double,
-                        b'#' => StructuralBondKind::Triple,
+                        b':' => StructuralBond::Aromatic,
+                        b'-' => StructuralBond::Single,
+                        b'=' => StructuralBond::Double,
+                        b'#' => StructuralBond::Triple,
                         _ => unsafe { unreachable_unchecked() }
                     });
                     pos += 1;
@@ -77,19 +77,19 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                 }
                 else {
                     if $is_aromatic && misc.aromatic_ions.contains(&adj_atom) {
-                        k = StructuralBondKind::Aromatic;
+                        k = StructuralBond::Aromatic;
                     }
                     else {
-                        k = StructuralBondKind::Single;
+                        k = StructuralBond::Single;
                     }
                 }
                 current_bounds.push(sf.bonds.len());
-                sf.atoms[adj_atom].1.push(sf.bonds.len());
+                sf.atoms[adj_atom].bonds.push(sf.bonds.len());
                 if aromatic_detection_data.init {
                     // Default believe there is no aromaticity
                     aromatic_detection_data.init = false;
-                    if k == StructuralBondKind::Single || k == StructuralBondKind::Double {
-                        if ((k == StructuralBondKind::Single) == aromatic_detection_data.last_one_was_double) {
+                    if k == StructuralBond::Single || k == StructuralBond::Double {
+                        if ((k == StructuralBond::Single) == aromatic_detection_data.last_one_was_double) {
                             // =X-C or -X=C bond
                             // There is aromaticity, so far
                             aromatic_detection_data.last_one_was_double = !aromatic_detection_data.last_one_was_double;
@@ -102,9 +102,9 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                     }
                 }
                 else {
-                    if k == StructuralBondKind::Single || k == StructuralBondKind::Double {
+                    if k == StructuralBond::Single || k == StructuralBond::Double {
                         aromatic_detection_data.init = true;
-                        aromatic_detection_data.last_one_was_double = k == StructuralBondKind::Double;
+                        aromatic_detection_data.last_one_was_double = k == StructuralBond::Double;
                         bonds_in_the_probably_aromatic_ring.push(sf.bonds.len());
                     }
                 }
@@ -118,10 +118,10 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                         Some(k) => k,
                         None => {
                             if $is_aromatic && misc.aromatic_ions.contains(&b) {
-                                StructuralBondKind::Aromatic
+                                StructuralBond::Aromatic
                             }
                             else {
-                                StructuralBondKind::Single
+                                StructuralBond::Single
                             }
                         }
                     };
@@ -140,16 +140,16 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                             if (length - 2) % 4 == 0 { // Test if it complies the Hueckel's rule
                                 for i in bonds_in_the_probably_aromatic_ring.iter() {
                                     let i = *i;
-                                    sf.bonds[i].k = StructuralBondKind::Aromatic;
+                                    sf.bonds[i].k = StructuralBond::Aromatic;
                                 }
-                                k = StructuralBondKind::Aromatic;
+                                k = StructuralBond::Aromatic;
                                 bonds_in_the_probably_aromatic_ring.clear();
                                 aromatic_detection_data.init = false;
                             }
                         }
                     }
                     current_bounds.push(sf.bonds.len());
-                    sf.atoms[b].1.push(sf.bonds.len());
+                    sf.atoms[b].bonds.push(sf.bonds.len());
                     sf.bonds.push(Bond { a: sf.atoms.len(), b, k });
                 }
                 else {
@@ -160,22 +160,22 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
                 misc.aromatic_ions.insert(sf.atoms.len());
             }
             adj_atom = Some(sf.atoms.len());
-            sf.atoms.push((Isotope::new(Ion::new($atom, $charge), $isotopic_spec), current_bounds));
+            sf.atoms.push(AtomAndBondI { atom: Isotope::new(Ion::new($atom, $charge), $isotopic_spec), bonds: current_bounds });
         }};
     }
     if let Some(_) = adj_atom {
         if !string.is_empty() {
             match string[0] {
                 b'-' => {
-                    waiting_bond = Some(StructuralBondKind::Single);
+                    waiting_bond = Some(StructuralBond::Single);
                     string = &string[1..];
                 },
                 b'=' => {
-                    waiting_bond = Some(StructuralBondKind::Double);
+                    waiting_bond = Some(StructuralBond::Double);
                     string = &string[1..];
                 },
                 b'#' => {
-                    waiting_bond = Some(StructuralBondKind::Triple);
+                    waiting_bond = Some(StructuralBond::Triple);
                     string = &string[1..];
                 },
                 _ => {}
@@ -370,19 +370,19 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
             if let None = waiting_bond {
                 match chr {
                     b':' => {
-                        waiting_bond = Some(StructuralBondKind::Aromatic);
+                        waiting_bond = Some(StructuralBond::Aromatic);
                         continue;
                     },
                     b'-' => {
-                        waiting_bond = Some(StructuralBondKind::Single);
+                        waiting_bond = Some(StructuralBond::Single);
                         continue;
                     },
                     b'=' => {
-                        waiting_bond = Some(StructuralBondKind::Double);
+                        waiting_bond = Some(StructuralBond::Double);
                         continue;
                     },
                     b'#' => {
-                        waiting_bond = Some(StructuralBondKind::Triple);
+                        waiting_bond = Some(StructuralBond::Triple);
                         continue;
                     },
                     _ => {}
@@ -393,4 +393,65 @@ pub fn parse_smiles_group<'a>(mut string: &'a [u8], sf: &mut Molecule, misc: &mu
     }
     bonds_in_the_probably_aromatic_ring.truncate(bond_count_in_the_probably_aromatic_ring);
     Ok(string)
+}
+
+pub fn parse(string: &str) -> Result<Molecule, ()> {
+    let mut sf = Molecule { atoms: Vec::new(), bonds: Vec::new(), coords: None };
+    let string = string.as_bytes();
+    let mut misc = smiles::SMILESMisc { automatic_hydrogens_targets: Vec::new(), 
+        labels: BTreeMap::new(), aromatic_ions: BTreeSet::new() };
+    let _ = smiles::parse_smiles_group(string, &mut sf, &mut misc, None, &mut smiles::AromaticDetectionData { init: false, 
+        last_one_was_double: false }, &mut Vec::new())?;
+    for atom in misc.automatic_hydrogens_targets {
+        let mut actual_valence = 0;
+        let mut aromatic_flip_flop = true;
+        for bond in sf.atoms[atom].bonds.iter() {
+            if sf.bonds[*bond].k == StructuralBond::Aromatic {
+                actual_valence += 1;
+                if aromatic_flip_flop {
+                    actual_valence += 1;
+                }
+                aromatic_flip_flop = !aromatic_flip_flop;
+            }
+            actual_valence += sf.bonds[*bond].k as isize;
+        }
+        let lack = match sf.atoms[atom].get_element() {
+            Element::Boron => 3 - actual_valence,
+            Element::Carbon => 4 - actual_valence,
+            Element::Nitrogen | Element::Phosphorus => {
+                if actual_valence <= 3 {
+                    3 - actual_valence
+                }
+                else if actual_valence <= 5 {
+                    5 - actual_valence
+                }
+                else {
+                    0
+                }
+            },
+            Element::Oxygen => 2 - actual_valence,
+            Element::Sulfur => {
+                if actual_valence <= 2 {
+                    2 - actual_valence
+                }
+                else if actual_valence <= 4 {
+                    4 - actual_valence
+                }
+                else if actual_valence <= 6 {
+                    6 - actual_valence
+                }
+                else {
+                    0
+                }
+            },
+            _ => 1 - actual_valence
+        };
+        for _ in 0..lack {
+            let b = vec![sf.bonds.len()];
+            sf.atoms[atom].bonds.push(sf.bonds.len());
+            sf.bonds.push(Bond { a: atom, b: sf.atoms.len(), k: StructuralBond::Single });
+            sf.atoms.push(AtomAndBondI { atom: Isotope::from(Element::Hydrogen), bonds: b });
+        }
+    }
+    Ok(sf)
 }
