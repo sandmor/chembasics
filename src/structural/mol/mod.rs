@@ -104,7 +104,7 @@ impl MolFile {
                         },
                         Block::CTab => {
                             if key == "ATOM" {
-                                if atoms.len() != atoms_count {
+                                if atoms.len() != atoms_count as usize {
                                     return Err(ParserError::Syntax);
                                 }
                                 current_block = Block::Atom;
