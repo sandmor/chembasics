@@ -14,13 +14,13 @@ homepage = "https://crates.io/crates/chembasics"
 repository = "https://github.com/sandmor/chembasics"
 
 [dependencies]
-ptable = "0"
+ptable = {package = "periodic-table-on-an-enum", version = "0.3"}
 image = "0"
 rayon = "1"
 xml-rs = "0.8"
 fnv = "1"
 [build-dependencies]
-ptable = "0"
+ptable  = {package = "periodic-table-on-an-enum", version = "0.3"}
 [dev-dependencies]
 glutin = "0"
 gl = "0"
